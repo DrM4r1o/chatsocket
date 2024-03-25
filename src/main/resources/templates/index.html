@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Chat Application using StompJs</title>
+</head>
+
+<body>
+    <div id="wrapper">
+        <ul>
+            <li>Open multiple browsers or tabs to chat across those.</li>
+            <li>You will need a STOMP broker running. The defaults will work for fresh RabbitMQ on local machine.</li>
+            <li>Adjust the <a href="https://stomp-js.github.io/api-docs/latest/classes/StompConfig.html">configuration</a> as per your STOMP broker.</li>
+            <li>A guide at <a href="https://stomp-js.github.io/guide/stompjs/2018/06/28/using-stompjs-v5.html">Using StompJs v5</a></li>
+            <li>For details on API calls see: <a href="https://stomp-js.github.io/api-docs/latest/classes/Client.html">API Reference</a></li>
+            <li>The html/css is heavily based on <a href="https://code.tutsplus.com/tutorials/how-to-create-a-simple-web-based-chat-application--net-5931">Simple Web-Based Chat Application</a></li>
+        </ul>
+        <div id="menu">
+            <p class="welcome">Welcome, <input title="username" name="username" id="username" type="text" value="Change Me"></p>
+        </div>
+
+        <div id="chatbox"></div>
+
+        <input name="usermsg" type="text" id="usermsg" size="63" title="usermsg" />
+        <button name="submitmsg" id="submitmsg">Send</button>
+    </div>
+
+    <!-- It is used for DOM manipulation, not mandatory to use stompjs -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+
+    <!-- Include from CDN for better performance, alternatively you can locally copy as well -->
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0-beta2/bundles/stomp.umd.min.js"></script>
+
+    <script type="application/javascript">
+        $(function () {
+            // WebSocket connection
+            const socket = new WebSocket('ws://localhost:8080/websocket');
+            let stompClient;
+
+            const stompConfig = {
+                // Broker URL, adjust for your broker setup
+                brokerURL: 'ws://localhost:8080/websocket',
+                debug: function (str) {
+                    console.log('STOMP: ' + str);
+                },
+                reconnectDelay: 200,
+                onConnect: function (frame) {
+                    const subscription = stompClient.subscribe('/topic/messages', function (message) {
+                        const payload = JSON.parse(message.body);
+                        displayIncomingMessage(payload.from, payload.text, payload.time);
+                    });
+                }
+            };
+
+            // Activate Stomp client
+            stompClient = StompJs.Stomp.over(socket);
+            stompClient.connect({}, stompConfig.onConnect);
+
+            // DOM event handlers
+            $('#submitmsg').click(function () {
+                if (publishMessage($('#username').val(), $('#usermsg').val())) {
+                    clearMessageInput();
+                }
+            });
+
+            function clearMessageInput() {
+                $('#usermsg').val('');
+            }
+
+            function publishMessage(user, message) {
+                if (message.length > 0) {
+                    const payload = { from: user, text: message };
+
+                    stompClient.send('/app/chat', {}, JSON.stringify(payload));
+                }
+            }
+
+            function displayIncomingMessage(user, message, time) {
+                const msgDiv = $('<div>').addClass('msgln');
+                msgDiv.html('<span class="user">[' + user + ']: </span><span class="message">' + message + '</span><span class="time">' + time + '</span>');
+                $('#chatbox').append(msgDiv);
+            }
+        });
+    </script>
+</body>
+
+</html>
